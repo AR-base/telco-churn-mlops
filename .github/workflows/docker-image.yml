@@ -1,0 +1,74 @@
+name: Docker image
+
+# Builds the real image from docker/, then checks it the way a user would run it.
+on:
+  push:
+    branches: [main]
+    paths: ["docker/**", ".github/workflows/docker-image.yml"]
+  pull_request:
+    paths: ["docker/**", ".github/workflows/docker-image.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint the Dockerfile
+        run: docker run --rm -i hadolint/hadolint < docker/Dockerfile
+
+      - name: Build the image (runs selftest.py inside; fails if the model does not reproduce the notebook)
+        run: docker build -t churn-risk-desk:ci docker
+
+      - name: Start the container and wait until Docker reports it healthy
+        run: |
+          docker run -d --name desk -p 8501:8501 -p 8000:8000 churn-risk-desk:ci
+          for i in $(seq 1 40); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' desk)
+            echo "health: $status"
+            [ "$status" = healthy ] && exit 0
+            [ "$(docker inspect -f '{{.State.Running}}' desk)" = true ] || break
+            sleep 5
+          done
+          exit 1
+
+      - name: Smoke-test the API and the website
+        run: |
+          curl -fsS http://localhost:8000/health
+          curl -fsS http://localhost:8000/model | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['name'], 'v' + d['version'], d['config'])"
+          python3 - <<'EOF'
+          import json, urllib.request
+          info = json.load(open("docker/app/model/model_info.json"))
+          case = info["selftest"]
+          body = json.dumps({"customer": case["customers"][0]}).encode()
+          req = urllib.request.Request("http://localhost:8000/predict", body, {"Content-Type": "application/json"})
+          got = json.load(urllib.request.urlopen(req))["churn_probability"]
+          want = round(case["probabilities"][0], 4)
+          print("predict:", got, "expected:", want)
+          assert abs(got - want) < 1e-4
+          bad = json.dumps({"customer": {**case["customers"][0], "Contract": "Lifetime"}}).encode()
+          try:
+              urllib.request.urlopen(urllib.request.Request("http://localhost:8000/predict", bad, {"Content-Type": "application/json"}))
+              raise SystemExit("invalid input was accepted")
+          except urllib.error.HTTPError as e:
+              assert e.code == 422, e.code
+              print("invalid input rejected with 422")
+          EOF
+          curl -fsS http://localhost:8501/_stcore/health && echo " website ok"
+          [ "$(docker exec desk id -u)" = 10001 ] && echo "runs as non-root user 10001"
+
+      - name: Stop cleanly (as `docker stop` does)
+        run: |
+          docker stop -t 20 desk
+          code=$(docker inspect -f '{{.State.ExitCode}}' desk)
+          echo "exit code: $code"
+          [ "$code" = 0 ]
+
+      - name: Container logs
+        if: always()
+        run: docker logs desk || true

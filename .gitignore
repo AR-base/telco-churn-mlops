@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ipynb_checkpoints/
+
+# Created when the notebook runs (data is downloaded, models/results are regenerated)
+**/data/
+**/figures/
+**/results/
+**/mlflow.db
+**/mlruns/
+**/mlartifacts/
+**/docker_src/
+**/churn-risk-desk-docker/
+**/.streamlit/
+!docker/app/.streamlit/
+**/cloudflared
+**/churn_api.py
+**/churn_app.py
+**/churn_features.py
+**/whatif.py
+!docker/app/*.py
+*.zip
+
+# Docker image exports
+*.tar
+*.tar.gz
