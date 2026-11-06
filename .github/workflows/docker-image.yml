@@ -120,3 +120,53 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release-file:
+    # The image as one compressed file, attached to the GitHub release "v1.0"
+    # (git refuses files over 100 MB; release files can be up to 2 GB).
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write        # create the release and upload the file
+    defaults:
+      run:
+        shell: bash          # with pipefail, so a failed `docker save` cannot produce a truncated file
+    env:
+      FILE: churn-risk-desk-1.0-amd64.tar.xz
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the image (Intel/AMD; selftest.py runs inside)
+        run: docker build --pull -t churn-risk-desk:1.0 docker
+
+      - name: Save it as one compressed file (xz, about 30 % smaller than gzip)
+        run: |
+          docker save churn-risk-desk:1.0 | xz -6 -T0 > "$FILE"
+          sha256sum "$FILE" > "$FILE.sha256"
+          ls -lh "$FILE"
+
+      - name: Prove the file loads back and works
+        run: |
+          docker rmi churn-risk-desk:1.0
+          docker load -i "$FILE"
+          docker run --rm churn-risk-desk:1.0 python selftest.py
+
+      - name: Attach it to the release v1.0 (replaces the file on later runs)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.0 >/dev/null 2>&1; then
+            gh release upload v1.0 "$FILE" "$FILE.sha256" --clobber
+          else
+            gh release create v1.0 "$FILE" "$FILE.sha256" --target "$GITHUB_SHA" --title "Churn risk desk 1.0" \
+              --notes "Docker image as a file (Intel/AMD computers). Load and run it with:
+
+          \`\`\`
+          docker load -i $FILE
+          docker run -p 8501:8501 -p 8000:8000 churn-risk-desk:1.0
+          \`\`\`
+
+          Then open http://localhost:8501. Apple-silicon Macs: use \`ghcr.io/ar-base/churn-risk-desk:1.0\` instead."
+          fi

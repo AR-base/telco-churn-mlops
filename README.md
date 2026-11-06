@@ -30,6 +30,13 @@ docker run -p 8501:8501 -p 8000:8000 ghcr.io/ar-base/churn-risk-desk:1.0
 
 Tags: `1.0`, `latest`, and `sha-<commit>` for each build. CI publishes only after the image has passed its tests.
 
+**Without a registry:** download `churn-risk-desk-1.0-amd64.tar.xz` from this repo's **Releases**, then:
+
+```
+docker load -i churn-risk-desk-1.0-amd64.tar.xz
+docker run -p 8501:8501 -p 8000:8000 churn-risk-desk:1.0
+```
+
 **Notebook:** open [`notebooks/telco_churn_pca_mlflow_api.ipynb`](notebooks/telco_churn_pca_mlflow_api.ipynb) in Google Colab and choose *Runtime → Run all* (about 3 minutes). It downloads the data and reproduces every table and figure. It then starts MLflow, the API and the website, and in §13 it rebuilds the Docker build folder from the registered model.
 
 **Build the image yourself:** see [`docker/README.md`](docker/README.md).
@@ -71,7 +78,8 @@ flowchart LR
 notebooks/   the full analysis + MLflow + API + website + Docker export (executed, with outputs)
 docker/      Docker build context: Dockerfile, pinned requirements, app code, exported model, self-test
 report/      group report (PDF)
-.github/     CI: builds the image, lints the Dockerfile, runs and smoke-tests the container, then publishes it to ghcr.io
+.github/     CI: builds the image, lints the Dockerfile, runs and smoke-tests the container, then publishes it
+             to ghcr.io and attaches it as a compressed file to the v1.0 release
 ```
 
 ## Engineering notes

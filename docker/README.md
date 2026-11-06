@@ -28,6 +28,8 @@ docker build -t churn-risk-desk:1.0 .
 
 The first build takes 3–5 minutes. It ends by running `selftest.py` inside the image, so look for **`4/4 checks passed`** in the output. If a check fails, the build stops: an image with a broken model is never created.
 
+The build has two stages, which keeps the image small. A full Python image installs the libraries, then deletes what the app never uses: test suites, C headers, bytecode caches, pip, and debug symbols in compiled libraries. Only the cleaned result is copied into the slim final image. This cuts the libraries from 529 MB to 405 MB.
+
 ## 3. Run it on your laptop
 
 ```
@@ -71,6 +73,8 @@ docker run -p 8501:8501 YOUR_USER/churn-risk-desk:1.0
 ```
 
 ### Option B: a file (no account, e.g. for a USB stick, Drive or Teams)
+
+A ready-made compressed file is attached to this repository's **Releases** (`churn-risk-desk-1.0-amd64.tar.xz`, about 120 MB). CI rebuilds and re-tests it on every change. To make your own file from the image on your laptop:
 
 ```
 docker save -o churn-risk-desk-1.0.tar churn-risk-desk:1.0
