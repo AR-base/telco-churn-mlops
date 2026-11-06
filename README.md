@@ -22,6 +22,14 @@ docker run -p 8501:8501 -p 8000:8000 luffu90/churn-risk-desk:1.0
 
 Then open the website at <http://localhost:8501> and the API docs at <http://localhost:8000/docs>. If a port is taken, change the number before the colon, for example `-p 8001:8000`.
 
+The same image is also published on GitHub Container Registry by CI, for Intel/AMD and Apple-silicon machines (see **Packages** on this repo's page):
+
+```
+docker run -p 8501:8501 -p 8000:8000 ghcr.io/ar-base/churn-risk-desk:1.0
+```
+
+Tags: `1.0`, `latest`, and `sha-<commit>` for each build. CI publishes only after the image has passed its tests.
+
 **Notebook:** open [`notebooks/telco_churn_pca_mlflow_api.ipynb`](notebooks/telco_churn_pca_mlflow_api.ipynb) in Google Colab and choose *Runtime → Run all* (about 3 minutes). It downloads the data and reproduces every table and figure. It then starts MLflow, the API and the website, and in §13 it rebuilds the Docker build folder from the registered model.
 
 **Build the image yourself:** see [`docker/README.md`](docker/README.md).
@@ -63,7 +71,7 @@ flowchart LR
 notebooks/   the full analysis + MLflow + API + website + Docker export (executed, with outputs)
 docker/      Docker build context: Dockerfile, pinned requirements, app code, exported model, self-test
 report/      group report (PDF)
-.github/     CI: builds the image, lints the Dockerfile, runs the container and smoke-tests it
+.github/     CI: builds the image, lints the Dockerfile, runs and smoke-tests the container, then publishes it to ghcr.io
 ```
 
 ## Engineering notes
